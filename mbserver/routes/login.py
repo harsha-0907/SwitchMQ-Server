@@ -13,7 +13,7 @@ router = APIRouter(prefix="/auth")
 @router.get("/login")
 async def sendLoginPage():
     try:
-        with open("src/loginPage.html", 'r ') as file:
+        with open("src/loginPage.html", 'r') as file:
             return HTMLResponse(content=file.read(), status_code=200)
 
     except FileNotFoundError as _e:
