@@ -1,6 +1,7 @@
 
 # Handles the entire login flow
 import json
+from typing import Annotated
 from utils.jwtUtils import encodeJWT
 from functools import lru_cache
 from fastapi import APIRouter, Body
