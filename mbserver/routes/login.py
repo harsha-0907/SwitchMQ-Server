@@ -3,7 +3,7 @@
 import json
 from utils.jwtUtils import encodeJWT
 from functools import lru_cache
-from fastapi import APIRouter
+from fastapi import APIRouter, Body
 from fastapi.responses import HTMLResponse, JSONResponse
 from utils.responsePages import *
 
@@ -21,7 +21,7 @@ async def sendLoginPage():
         return INTERNAL_SERVER_ERROR_500_RESP
     
 @router.post("/login")
-async def fetchLoginCreds(username: str, password: str):
+async def fetchLoginCreds(username: Annotated[str, Body()], password: Annotated[str, Body()]):
     credentials = dict()
     with open("credentials.json", 'r') as file:
         credentials = json.load(file)
