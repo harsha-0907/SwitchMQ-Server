@@ -74,5 +74,25 @@ class Exchange:
 
         # self.handleSocket()
 
+    def addQueue(self, queueName: str):
+        if queueName in self.queues:
+            # Update the status of the request in redis to False
+            return False
+        
+        self.queues[queueName] = Queue(queueName)
+    
+    async def handleRedis(self):
+        """ Updates the Redis with database Info"""
+        # TO-DO - Add redis handling
+        pass
+
+
+
+
+
+
+
+
+
 
 
