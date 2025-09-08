@@ -14,7 +14,7 @@ app.include_router(uiPage.router, tags=["Admin-UI"])
 exchange_process = None
 
 def start_exchange():
-    exchange = Exchange(hostName="server01", exchangeName="default", port=48001, queues=[""])
+    exchange = Exchange(hostName="server01", exchangeName="", port=47001, queues=[""])
     asyncio.run(exchange.handleSocket())  # Runs the async socket server
 
 @app.on_event("startup")

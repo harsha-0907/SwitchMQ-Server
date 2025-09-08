@@ -1,8 +1,10 @@
 
 # Server responsible for websocket & MB
-import os, json, socket, asyncio
+import os, json, socket, asyncio, redis
+from threading import Lock
 from dotenv import load_dotenv
 from mbexceptions import *
+from apscheduler.schedulers.background import BackgroundScheduler
 from utils.jwtUtils import decodeJWT
 from utils.responsePages import UN_AUTH_401_RESP
 from fastapi import (FastAPI, WebSocket, Header, HTTPException, Depends, WebSocketException, status, WebSocketDisconnect)
@@ -10,22 +12,48 @@ from fastapi import (FastAPI, WebSocket, Header, HTTPException, Depends, WebSock
 load_dotenv()
 users = dict()
 connections = dict()
-dbInfo = {
-    "": {
-        "stats": {
-            "maxSize": 100000, # Mandatory
-            "count": 1,    # Mandatory
-            "host": "127.0.0.1",# Mandatory
-            "port": 48001   # Mandatory
-        },
-        "": 1
-    }
-}
-exchanges = [""]    # Update this along with dbInfo
+
+dbInfoLock = Lock()
+dbInfo = {}
 app = FastAPI()
 
 NUMBER_OF_MB_WORKERS = int(os.getenv("MB_WORKERS"))
 MAX_MESSAGE_SIZE = int(os.getenv("MAX_MESSAGE_SIZE"))
+
+def updateDBInfo():
+    """ Fetch data from redis db and filter data"""
+    global dbInfo, dbInfoLock
+    redisClient = redis.Redis(
+            host=os.getenv("REDIS_HOST"),
+            port=int(os.getenv("REDIS_PORT")),
+            username=os.getenv("REDIS_USERNAME"),
+            password=os.getenv("REDIS_PASSWORD"),
+            decode_responses=True
+        )
+    
+    keys = redisClient.keys()
+    redisData = dict()
+
+    for key in keys:
+        _exchangeData = redisClient.hgetall(key)
+        key = key.split(".")[1]
+        exchangeData = {
+            "host": _exchangeData["ipAddress"],
+            "count": int(_exchangeData["totalMessages"]),
+            "port": int(_exchangeData["port"]),
+            "maxSize": int(_exchangeData["maxMessages"])
+        }
+        queues = list(_exchangeData["queues"].split(','))
+        redisData[key] = {
+            "stats": exchangeData,
+            "queues": queues
+        }
+    
+    with dbInfoLock:
+        for exchangeName, exchangeData in redisData.items():
+            dbInfo[exchangeName] = exchangeData
+    
+    print("DB Info Updated")
 
 def isAuthenticated(websocket: WebSocket):
     authorization = websocket.headers.get("authorization", None)
@@ -71,6 +99,7 @@ def processExchange(host, port, message) -> str:
 
 async def executeCommand(rawMessage:str, userData, inputData: dict)-> str:
     """ Executes the commands & returns the response"""
+    global dbInfo, dbInfoLock
     reqAction = inputData.get("action"); reqExchange = inputData.get("exchange", ""); reqQueues = inputData.get("queues", [])
     userAuthorizedExchanges = userData.get("access", {}).get("exchange", [])
     
@@ -78,7 +107,8 @@ async def executeCommand(rawMessage:str, userData, inputData: dict)-> str:
         print("Un-Authorized")
         raise UnAuthorizedAccess()
     
-    exchangeInfo = dbInfo.get(reqExchange, None)
+    with dbInfoLock:
+        exchangeInfo = dbInfo.get(reqExchange, None)
 
     if exchangeInfo is None:
         raise ExchangeNotFoundError()
@@ -117,9 +147,9 @@ async def executeCommand(rawMessage:str, userData, inputData: dict)-> str:
             raise ExchangeOverflowError()
         
         resp = json.loads(await asyncio.to_thread(processExchange, exchangeHost, exchangePort, rawMessage))
-
         respStatusCode = resp.get("statusCode", 600)
 
+        # print(resp)
         if respStatusCode == 200:
             count = resp.get("stats" ,{}).get("count", None)
             if count:
@@ -142,7 +172,6 @@ async def executeCommand(rawMessage:str, userData, inputData: dict)-> str:
 
     else:
         raise UnknownException(message="Action: Action not Recognized")
-
 
 @app.websocket("/mb")
 async def handleWebsocket(websocket: WebSocket, userData: dict = Depends(isAuthenticated)):
@@ -196,7 +225,6 @@ async def handleWebsocket(websocket: WebSocket, userData: dict = Depends(isAuthe
                 del(users[user["username"]])
             del(connections[websocket])
 
-
 @app.get("/")
 async def getActiveStatus():
     return {
@@ -204,10 +232,14 @@ async def getActiveStatus():
         "message": "Server is Active"
     }
 
-# @app.on_event("startup")
-# async def setUp():
-#     # TO-DO - Setup Redis Client
-#     pass
+@app.on_event("startup")
+async def setUp():
+    # Seting up the background scheduler
+    bgScheduler = BackgroundScheduler()
+    bgScheduler.start()
+    bgScheduler.add_job(updateDBInfo, 'interval', seconds=5)
+
+    print("Starting the System...")
 
 if __name__ == "__main__":
     import uvicorn
