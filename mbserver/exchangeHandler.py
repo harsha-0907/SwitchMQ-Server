@@ -1,7 +1,9 @@
 
-# This is the exchange handler code
-# This will be a function
-
+import os, json, redis, socket, asyncio, random, dotenv
+from threading import Lock
+from multiprocessing import Manager
+from mbexceptions import *
+from utils.exchangeHandlerUtils import fetchMessageId
 
 class Message:
     def __init__(self, messageId: str = "", head=False):
@@ -37,6 +39,40 @@ class Queue:
 
         return message.messageId
 
+
+class Exchange:
+    def __init__(self, hostName: str, exchangeName: str,
+        port: int, queues: list = None, priority: int = 1,
+        bind_local: bool = True, maxSocketConnections: int = 10,
+        timeOut: int = 5, maxMessages: int = 10000
+    ):
+        self.hostName: str = hostName
+        self.ipAddress: str = "127.0.0.1" if bind_local else "0.0.0.0"
+        self.priority: int = priority
+        self.port: int = port
+        self.exchangeName: str = exchangeName
+        self.queues = dict()
+        self.terminateExchange: bool = False
+        self.maxSocketConnections = maxSocketConnections
+        self.timeOut = timeOut
+
+        self.messages = {}  # {primaryId: {secId: (message, count)}}
+        self.locks = {}     # {primaryId: asyncio.Lock()}
+
+        # Initialize queues if provided
+        if queues:
+            for queue in queues:
+                self.addQueue(queue)
+
+        for i in range(1000):
+            self.messages[i] = {}
+            self.locks[i] = asyncio.Lock()
+
+        self.totalMessages = 0
+        self.maxMessages = maxMessages
+
+
+        # self.handleSocket()
 
 
 
