@@ -2,6 +2,7 @@ annotated-types==0.7.0
 anyio==4.10.0
 asyncio==4.0.0
 certifi==2025.8.3
+charset-normalizer==3.4.3
 click==8.2.1
 dnspython==2.7.0
 email-validator==2.3.0
@@ -26,6 +27,8 @@ PyJWT==2.10.1
 python-dotenv==1.1.1
 python-multipart==0.0.20
 PyYAML==6.0.2
+redis==6.4.0
+requests==2.32.5
 rich==14.1.0
 rich-toolkit==0.15.1
 rignore==0.6.4
