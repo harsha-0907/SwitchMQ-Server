@@ -69,6 +69,46 @@ def processExchange(host, port, message) -> str:
     finally:
         return resp
 
+async def executeCommand(rawMessage:str, userData, inputData: dict)-> str:
+    """ Executes the commands & returns the response"""
+    reqAction = inputData.get("action"); reqExchange = inputData.get("exchange", ""); reqQueues = inputData.get("queues", [])
+    userAuthorizedExchanges = userData.get("access", {}).get("exchange", [])
+    
+    if reqExchange not in userAuthorizedExchanges:
+        print("Un-Authorized")
+        raise UnAuthorizedAccess()
+    
+    exchangeInfo = dbInfo.get(reqExchange, None)
+
+    if exchangeInfo is None:
+        raise ExchangeNotFoundError()
+    
+    exchangeStats = exchangeInfo.get("stats")
+    exchangeHost, exchangePort = exchangeStats.get("host"), exchangeStats.get("port")
+
+    if reqAction == "GET":
+        resp = json.loads(await asyncio.to_thread(processExchange, exchangeHost, exchangePort, rawMessage))
+
+        respStatusCode = resp.get("statusCode", 600)
+
+        if respStatusCode == 200:
+            count = resp.get("stats", {}).get("count", None)
+            if count:
+                dbInfo[reqExchange]["stats"]["count"] = count
+            
+            return json.dumps({
+                "statusCode": 200,
+                "error": False,
+                "message": resp.get("message")
+            })
+
+        else:
+            if respStatusCode == 604:
+                raise NoMessageException()
+            
+            raise UnknownException(message=resp.get("message"), statusCode=respStatusCode)
+
+
 
 @app.get("/")
 async def getActiveStatus():
