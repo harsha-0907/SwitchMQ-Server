@@ -148,6 +148,62 @@ class Exchange:
                 await asyncio.sleep(0.1)
 
 
+    async def processMessage(self, message: str):
+        message = json.loads(message)
+        action = message.get("action", None)
+        queueNames = message.get("queues")
+        messageBody = message.get("message", "")
+
+        if action == "GET":
+            queueName = queueNames[0]
+            # TO-DO - Fetch the message and return it
+            messageId = self.queues[queueName].popMessage()
+            messageBody = await self.fetchMessage(messageId)
+            
+            if messageBody is not None:
+                return json.dumps({
+                    "statusCode": 200,
+                    "error": False,
+                    "message": messageBody,
+                    "stats": {
+                        "count": self.totalMessages
+                    }
+                })
+
+            else:
+                raise NoMessageException()
+        
+        elif action == "POST":
+            # All exceptions will be handled at the socket
+            if self.totalMessages >= self.maxMessages:
+                raise ExchangeOverflowError()
+            
+            messageId = fetchMessageId()
+            await self.saveMessage(message=message, messageId=messageId, numberOfCopies=len(queueNames))
+            self.totalMessages += 1
+
+            for queueName in queueNames:
+                try:
+                    resp = self.queues[queueName].addMessage(messageId)
+                
+                except Exception as _e:
+                    # Remove all those messages
+                    pass
+
+            return json.dumps({
+                "statusCode": 200,
+                "error": False,
+                "message": "Done",
+                "stats": {
+                    "count": self.totalMessages
+                }
+            })
+
+            raise UnknownException("Unknown Exception")
+
+        else:
+            raise UnknownException("Action: Unauthorized Action")
+
 
 
 
