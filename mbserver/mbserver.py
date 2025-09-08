@@ -108,6 +108,40 @@ async def executeCommand(rawMessage:str, userData, inputData: dict)-> str:
             
             raise UnknownException(message=resp.get("message"), statusCode=respStatusCode)
 
+    elif reqAction == "POST":
+        message = inputData.get("message")
+        if not isValidMessage(rawMessage):
+            raise MessageException("Message Size Exceeded")
+        
+        if exchangeStats.get("count") >= exchangeStats.get("maxSize"):
+            raise ExchangeOverflowError()
+        
+        resp = json.loads(await asyncio.to_thread(processExchange, exchangeHost, exchangePort, rawMessage))
+
+        respStatusCode = resp.get("statusCode", 600)
+
+        if respStatusCode == 200:
+            count = resp.get("stats" ,{}).get("count", None)
+            if count:
+                dbInfo[reqExchange]["stats"]["size"] = count
+            
+            return json.dumps({
+                "statusCode": 200,
+                "error": False,
+                "message": "Success"
+            })
+        
+        else:
+            if respStatusCode == 602:
+                raise ExchangeOverflowError()
+            
+            elif respStatusCode == 606:
+                raise MemoryException("MemoryException: Insufficient Free Space")
+            
+            raise UnknownException(message=resp.get("message", "Unknown Exception"), statusCode=respStatusCode)
+
+
+
 
 
 @app.get("/")
