@@ -38,6 +38,25 @@ def isAuthenticated(websocket: WebSocket):
     
     return userData
 
+
+def isValidMessage(message):
+    """ Performs any filter actions that need to be performed"""
+    if len(message) > MAX_MESSAGE_SIZE:
+        return False
+    
+    return True
+
+def processMessage(message):
+    """ Process the message to escape any characters"""
+    if message[0] == "~":
+        return '~' + message
+
+    if message == "GET":
+        return '~' + message
+
+    return message
+
+
 @app.get("/")
 async def getActiveStatus():
     return {
