@@ -87,6 +87,21 @@ class Exchange:
         pass
 
 
+    async def saveMessage(self, message: str, messageId: str, numberOfCopies):
+        primaryId, secId = messageId.split("."); primaryId = int(primaryId)
+        async with self.locks[primaryId]:
+            self.messages[primaryId][secId] = (message, numberOfCopies)
+    
+    async def fetchMessage(self, messageId: str):
+        primaryId, secId = messageId.split("."); primaryId = int(primaryId)
+        async with self.locks[primaryId]:
+            message = self.messages.get(primaryId, {}).get(secId, None)
+            messageBody, messageCount = message
+
+            if messageCount == 1:
+                del(self.messages[primaryId][secId])
+            return messageBody
+
 
 
 
