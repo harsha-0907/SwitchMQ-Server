@@ -38,7 +38,6 @@ def isAuthenticated(websocket: WebSocket):
     
     return userData
 
-
 def isValidMessage(message):
     """ Performs any filter actions that need to be performed"""
     if len(message) > MAX_MESSAGE_SIZE:
@@ -55,6 +54,20 @@ def processMessage(message):
         return '~' + message
 
     return message
+
+def processExchange(host, port, message) -> str:
+    """ Communicates with the exchange-via socket"""
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.connect((host, port))
+        sock.sendall(bytes(message, "utf-8"))
+        resp = sock.recv(1024).decode("utf-8")
+    
+    except Exception as _e:
+        resp = ReturnableExceptio(_e)
+    
+    finally:
+        return resp
 
 
 @app.get("/")
