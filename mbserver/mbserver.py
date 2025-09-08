@@ -164,7 +164,6 @@ async def handleWebsocket(websocket: WebSocket, userData: dict = Depends(isAuthe
                 ack = data.get("ack", False)
                 if ack:
                     resp = await executeCommand(rawMessage=_data,userData=userData, inputData=data)
-                    print("sending ", type(resp))
                     await websocket.send_text(resp)
                 else:
                     asyncio.create_task(executeCommand(rawMessage=_data,userData=userData, inputData=data))
