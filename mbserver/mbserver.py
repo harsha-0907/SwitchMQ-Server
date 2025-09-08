@@ -144,6 +144,59 @@ async def executeCommand(rawMessage:str, userData, inputData: dict)-> str:
         raise UnknownException(message="Action: Action not Recognized")
 
 
+@app.websocket("/mb")
+async def handleWebsocket(websocket: WebSocket, userData: dict = Depends(isAuthenticated)):
+    """ Fetches the message from client & sends it as-is to the executeCommand -> Sends reply as-is & handles exceptions"""
+    await websocket.accept()
+    connections[websocket] = userData
+    users[userData["username"]] = userData
+
+    try:
+        while True:
+            try:
+                _data = await websocket.receive_text()
+                
+                if _data == "Ping":  # Ping-Response
+                    await websocket.send_text("Suii")
+                    continue
+
+                data = json.loads((_data))
+                ack = data.get("ack", False)
+                if ack:
+                    resp = await executeCommand(rawMessage=_data,userData=userData, inputData=data)
+                    print("sending ", type(resp))
+                    await websocket.send_text(resp)
+                else:
+                    asyncio.create_task(executeCommand(rawMessage=_data,userData=userData, inputData=data))
+
+            except json.JSONDecodeError as e:
+                resp = str(ReturnableException(JSONError()))
+                await websocket.send_text(resp)
+            
+            except WebSocketDisconnect as e:
+                # Break the loop
+                break
+
+            except WebSocketException as _we:
+                # Break the loop
+                print(f"Websocket Exception {_we}")
+                break
+            
+            except Exception as e:
+                resp = str(ReturnableException(e))
+                await websocket.send_text(resp)
+
+    except Exception as e:
+        print(e)
+    
+    finally:
+        # Connection terminated
+        if websocket in connections:
+            user = connections[websocket]
+            if user["username"] in users:
+                del(users[user["username"]])
+            del(connections[websocket])
+
 
 @app.get("/")
 async def getActiveStatus():
