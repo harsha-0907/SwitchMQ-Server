@@ -28,7 +28,6 @@ class Queue:
             self.tail = newMessage 
         
     def popMessage(self):
-        print("Removing Message")
         if self.head.next is None:
             raise NoMessageException()
         
