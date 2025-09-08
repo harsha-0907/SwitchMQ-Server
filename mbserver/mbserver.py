@@ -140,7 +140,8 @@ async def executeCommand(rawMessage:str, userData, inputData: dict)-> str:
             
             raise UnknownException(message=resp.get("message", "Unknown Exception"), statusCode=respStatusCode)
 
-
+    else:
+        raise UnknownException(message="Action: Action not Recognized")
 
 
 
