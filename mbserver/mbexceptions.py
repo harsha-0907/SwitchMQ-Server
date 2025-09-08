@@ -52,3 +52,12 @@ class JSONError(Exception):
     def __init__(self, message="Error while encoding/decoding message"):
         super().__init__(message)
         self.statusCode = 607
+
+# System-Architecture Errors
+class ExternalSystemError(Exception):
+    def __init__(self, message="Unable to connect with external system"):
+        self.args = message
+        self.statusCode = 800
+
+
+

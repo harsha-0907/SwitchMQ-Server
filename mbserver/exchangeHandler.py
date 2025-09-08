@@ -1,9 +1,12 @@
 
-import os, json, redis, socket, asyncio, random, dotenv
+import os, json, socket, asyncio, random, dotenv, redis
 from threading import Lock
 from multiprocessing import Manager
 from mbexceptions import *
 from utils.exchangeHandlerUtils import fetchMessageId
+from apscheduler.schedulers.background import BackgroundScheduler
+
+dotenv.load_dotenv()
 
 class Message:
     def __init__(self, messageId: str = "", head=False):
@@ -38,7 +41,6 @@ class Queue:
 
         return message.messageId
 
-
 class Exchange:
     def __init__(self, hostName: str, exchangeName: str,
         port: int, queues: list = None, priority: int = 1,
@@ -50,13 +52,14 @@ class Exchange:
         self.priority: int = priority
         self.port: int = port
         self.exchangeName: str = exchangeName
-        self.queues = dict()
-        self.terminateExchange: bool = False
+        self.__queues = dict()
+        self.__terminateExchange: bool = False
         self.maxSocketConnections = maxSocketConnections
         self.timeOut = timeOut
+        self.initializeRedis()
 
-        self.messages = {}  # {primaryId: {secId: (message, count)}}
-        self.locks = {}     # {primaryId: asyncio.Lock()}
+        self.__messages = {}  # {primaryId: {secId: (message, count)}}
+        self.__locks = {}     # {primaryId: asyncio.Lock()}
 
         # Initialize queues if provided
         if queues:
@@ -64,41 +67,73 @@ class Exchange:
                 self.addQueue(queue)
 
         for i in range(1000):
-            self.messages[i] = {}
-            self.locks[i] = asyncio.Lock()
+            self.__messages[i] = {}
+            self.__locks[i] = asyncio.Lock()
 
         self.totalMessages = 0
         self.maxMessages = maxMessages
-
-
-        # self.handleSocket()
+        
+        # Initializing BgScheduler
+        scheduler = BackgroundScheduler()
+        scheduler.start()
+        scheduler.add_job(self.updateRedis, 'interval', seconds=5)
 
     def addQueue(self, queueName: str):
-        if queueName in self.queues:
+        if queueName in self.__queues:
             # Update the status of the request in redis to False
             return False
         
-        self.queues[queueName] = Queue(queueName)
+        self.__queues[queueName] = Queue(queueName)
     
-    async def handleRedis(self):
+    def initializeRedis(self):
+        self.__redisCreds = {
+            "host": os.getenv("REDIS_HOST"),
+            "port": int(os.getenv("REDIS_PORT")),
+            "username": os.getenv("REDIS_USERNAME"),
+            "password": os.getenv("REDIS_PASSWORD")
+        }
+        
+        self.__redisClient = redis.Redis(
+            host=self.__redisCreds["host"],
+            port=self.__redisCreds["port"],
+            decode_responses=True,
+            username=self.__redisCreds["username"],
+            password=self.__redisCreds["password"]
+        )
+        
+    def updateRedis(self):
         """ Updates the Redis with database Info"""
         # TO-DO - Add redis handling
-        pass
+        if not self.__redisClient.ping():
+            raise ExternalSystemArchitecture("Unable to connect with Redis")
 
+        exchangeValues = dict()
+        _exchangeValues = vars(self)
+        for _exchangeKey, _exchangeValue in _exchangeValues.items():
+            if _exchangeKey.startswith("_"):
+              continue
+
+            exchangeValues[_exchangeKey] = str(_exchangeValue)
+        
+        queues = ','.join(list(self.__queues.keys()))
+        exchangeValues["queues"] = queues
+        print("Updating Redis DB")
+        self.__redisClient.hset(self.hostName+'.'+self.exchangeName, mapping=exchangeValues)
 
     async def saveMessage(self, message: str, messageId: str, numberOfCopies):
         primaryId, secId = messageId.split("."); primaryId = int(primaryId)
-        async with self.locks[primaryId]:
-            self.messages[primaryId][secId] = (message, numberOfCopies)
+        async with self.__locks[primaryId]:
+            self.__messages[primaryId][secId] = (message, numberOfCopies)
     
     async def fetchMessage(self, messageId: str):
         primaryId, secId = messageId.split("."); primaryId = int(primaryId)
-        async with self.locks[primaryId]:
-            message = self.messages.get(primaryId, {}).get(secId, None)
+        async with self.__locks[primaryId]:
+            message = self.__messages.get(primaryId, {}).get(secId, None)
             messageBody, messageCount = message
 
             if messageCount == 1:
-                del(self.messages[primaryId][secId])
+                del(self.__messages[primaryId][secId])
+                self.totalMessages -= 1
             return messageBody
 
     async def handle_client(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter, timeOut: int = 5):
@@ -143,9 +178,8 @@ class Exchange:
         print(f"Server started on {self.ipAddress}:{self.port}")
 
         async with server:
-            while not self.terminateExchange:
-                await asyncio.sleep(0.1)
-
+            while not self.__terminateExchange:
+                await asyncio.sleep(0.01) # 0.01 sec is found to be optimal
 
     async def processMessage(self, message: str):
         message = json.loads(message)
@@ -156,7 +190,7 @@ class Exchange:
         if action == "GET":
             queueName = queueNames[0]
             # TO-DO - Fetch the message and return it
-            messageId = self.queues[queueName].popMessage()
+            messageId = self.__queues[queueName].popMessage()
             messageBody = await self.fetchMessage(messageId)
             
             if messageBody is not None:
@@ -183,7 +217,7 @@ class Exchange:
 
             for queueName in queueNames:
                 try:
-                    resp = self.queues[queueName].addMessage(messageId)
+                    resp = self.__queues[queueName].addMessage(messageId)
                 
                 except Exception as _e:
                     # Remove all those messages
@@ -202,14 +236,4 @@ class Exchange:
 
         else:
             raise UnknownException("Action: Unauthorized Action")
-
-
-
-
-
-
-
-
-
-
 
