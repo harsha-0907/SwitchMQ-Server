@@ -102,6 +102,53 @@ class Exchange:
                 del(self.messages[primaryId][secId])
             return messageBody
 
+    async def handle_client(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter, timeOut: int = 5):
+        addr = writer.get_extra_info("peername")
+
+        try:
+            # Wait for message with timeout
+            data = await asyncio.wait_for(reader.read(6000), timeout=timeOut)
+            if not data:
+                return
+
+            message = data.decode("utf-8")
+            try:
+                response = await self.processMessage(message)
+
+            except Exception as _e:
+                response = str(ReturnableException(_e))
+
+            writer.write(response.encode())
+            await writer.drain()
+
+        except asyncio.TimeoutError:
+            pass
+
+        except Exception as e:
+            print("Exception ", e)
+            pass
+
+        finally:
+            writer.close()
+            await writer.wait_closed()
+    
+    # Socket Handler
+    async def handleSocket(self):
+        server = await asyncio.start_server(
+            self.handle_client,
+            self.ipAddress,
+            self.port,
+            backlog=self.maxSocketConnections
+        )
+
+        print(f"Server started on {self.ipAddress}:{self.port}")
+
+        async with server:
+            while not self.terminateExchange:
+                await asyncio.sleep(0.1)
+
+
+
 
 
 
