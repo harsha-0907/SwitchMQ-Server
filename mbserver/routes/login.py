@@ -1,25 +1,26 @@
 
 # Handles the entire login flow
-import json
+import json, aiofiles
 from typing import Annotated
 from utils.jwtUtils import encodeJWT
-from functools import lru_cache
 from fastapi import APIRouter, Body
 from fastapi.responses import HTMLResponse, JSONResponse
 from utils.responsePages import *
+from utils.routeUtils import fetchFile
 
 router = APIRouter(prefix="/auth")
 
-@lru_cache
 @router.get("/login")
 async def sendLoginPage():
+    resp = None
     try:
-        with open("src/loginPage.html", 'r') as file:
-            return HTMLResponse(content=file.read(), status_code=200)
+        loginPage = fetchFile(filePath="src/loginPage.html")
+        resp = HTMLResponse(content=loginPage, status_code=200)
 
     except FileNotFoundError as _e:
-        print("File Removed!")
-        return INTERNAL_SERVER_ERROR_500_RESP
+        resp = INTERNAL_SERVER_ERROR_500_RESP
+    
+    return resp
     
 @router.post("/login")
 async def fetchLoginCreds(username: Annotated[str, Body()], password: Annotated[str, Body()]):
