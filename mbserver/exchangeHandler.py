@@ -43,7 +43,7 @@ class Queue:
 
 class Exchange:
     def __init__(self, hostName: str, exchangeName: str,
-        port: int, queues: list = None, priority: int = 1,
+        port: int, terminateSwitch, queues: list = None, priority: int = 1,
         bind_local: bool = True, maxSocketConnections: int = 10,
         timeOut: int = 5, maxMessages: int = 10000
     ):
@@ -53,7 +53,7 @@ class Exchange:
         self.port: int = port
         self.exchangeName: str = exchangeName
         self.__queues = dict()
-        self.__terminateExchange: bool = False
+        self.__terminateExchange = terminateSwitch
         self.maxSocketConnections = maxSocketConnections
         self.timeOut = timeOut
         self.initializeRedis()
@@ -178,8 +178,11 @@ class Exchange:
         print(f"Server started on {self.ipAddress}:{self.port}")
 
         async with server:
-            while not self.__terminateExchange:
+            while not self.__terminateExchange.is_set():
+                # print(self.__terminateExchange)
                 await asyncio.sleep(0.01) # 0.01 sec is found to be optimal
+
+        print("Exchange Stopped")
 
     async def processMessage(self, message: str):
         message = json.loads(message)
