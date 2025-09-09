@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>SwitchMQ-Dashboard</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #f4f6f8;
+      color: #333;
+    }
+
+    h1 {
+      text-align: center;
+      padding: 20px 0;
+      font-size: 22px;
+      background-color: #fff;
+      margin: 0;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 20px auto;
+      padding: 0 20px;
+    }
+
+    section {
+      margin-bottom: 30px;
+    }
+
+    .section-title {
+      margin-bottom: 10px;
+      font-size: 18px;
+      font-weight: 600;
+      border-bottom: 1px solid #ddd;
+      padding-bottom: 5px;
+      color: #444;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 15px;
+    }
+
+    .card {
+      background-color: #fff;
+      border: 1px solid #e0e0e0;
+      border-radius: 6px;
+      padding: 12px 14px;
+      font-size: 13px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+
+    .card-header {
+      font-weight: bold;
+      font-size: 15px;
+      margin-bottom: 8px;
+      color: #222;
+    }
+
+    .data-row {
+      margin: 2px 0;
+    }
+
+    .data-row strong {
+      display: inline-block;
+      min-width: 120px;
+      color: #555;
+    }
+
+    .btn {
+      padding: 3px 8px;
+      border: none;
+      border-radius: 3px;
+      font-size: 12px;
+      margin-right: 5px;
+      cursor: pointer;
+    }
+
+    .edit-btn {
+      background-color: #007bff;
+      color: white;
+    }
+
+    .delete-btn {
+      background-color: #dc3545;
+      color: white;
+    }
+
+    .btn-container {
+      margin-top: 8px;
+    }
+
+    @media (max-width: 768px) {
+      .data-row strong {
+        min-width: 100px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Dashboard</h1>
+
+  <div class="container">
+
+    <!-- Users Section -->
+    <section>
+      <div class="section-title">Users</div>
+      <div id="usersContainer" class="grid"></div>
+    </section>
+
+    <!-- Exchanges Section -->
+    <section>
+      <div class="section-title">Exchanges</div>
+      <div id="exchangesContainer" class="grid"></div>
+    </section>
+
+  </div>
+
+  <script>
+    const baseUrl = "https://42425-firebase-mb-sever-1756714755202.cluster-cz5nqyh5nreq6ua6gaqd7okl7o.cloudworkstations.dev/ui"
+    
+    function renderUsers(usersObject) {
+        const container = document.getElementById("usersContainer");
+        container.innerHTML = ""; // clear previous content
+
+        // Iterate over object keys (usernames)
+        Object.keys(usersObject).forEach(username => {
+            const user = usersObject[username];
+
+            const userDiv = document.createElement("div");
+            userDiv.className = "card";
+
+            userDiv.innerHTML = `
+            <div class="card-header">${user.username}</div>
+            <div class="data-row"><strong>UI Access:</strong> ${user.access.ui ? 'Yes' : 'No'}</div>
+            <div class="data-row"><strong>Admin:</strong> ${user.access.admin ? 'Yes' : 'No'}</div>
+            <div class="data-row"><strong>Allowed Exchanges:</strong> ${
+                Array.isArray(user.access.exchange)
+                ? (user.access.exchange.length === 0 || (user.access.exchange.length === 1 && user.access.exchange[0] === ""))
+                    ? "Default"
+                    : user.access.exchange.join(", ")
+                : user.access.exchange === "*" ? "All" : user.access.exchange
+            }</div>
+            <div class="data-row"><strong>Allowed Queues:</strong> ${
+                Array.isArray(user.access.queue)
+                ? (user.access.queue.length === 0 || (user.access.queue.length === 1 && user.access.queue[0] === ""))
+                    ? "Default"
+                    : user.access.queue.join(", ")
+                : user.access.queue === "*" ? "All" : user.access.queue
+            }</div>
+            <div class="btn-container">
+                <button class="btn edit-btn" onclick="editUser('${user.username}')">Edit</button>
+                <button class="btn delete-btn" onclick="deleteUser('${user.username}')">Delete</button>
+            </div>
+            `;
+
+            container.appendChild(userDiv);
+        });
+        }
+
+    function renderExchanges(exchanges) {
+      const container = document.getElementById("exchangesContainer");
+      exchanges.forEach(exchange => {
+        const exchangeDiv = document.createElement("div");
+        exchangeDiv.className = "card";
+
+        let html = `<div class="card-header">${exchange.exchangeName || "Default"}</div>`;
+        for (const key in exchange) {
+          const value = exchange[key] === "" ? "Default" : exchange[key];
+          html += `<div class="data-row"><strong>${key}:</strong> ${value}</div>`;
+        }
+        html += `
+          <div class="btn-container">
+            <button class="btn delete-btn" onclick="deleteExchange('${exchange.exchangeName || "Default"}')">Delete</button>
+          </div>
+        `;
+        exchangeDiv.innerHTML = html;
+
+        container.appendChild(exchangeDiv);
+      });
+    }
+
+    function editUser(username) {
+      alert("Edit user: " + username);
+    }
+
+    function deleteUser(_username) {
+        const action = confirm("Delete user: " + _username);
+        if (action) {
+          const url = baseUrl + `/exchange?username=${encodeURIComponent(_username)}`;
+          const request = new Request(url, {
+              method: "DELETE",
+              headers: {
+                  "Content-Type": "application/json"
+              }
+          });
+            const params = new URLSearchParams({ username: _username });
+            baseUrl = baseUrl+'/user'
+            fetch(request).then((resp) => {
+                if (resp.ok) {
+                return resp.json();
+                } else {
+                return { message: "Unable to delete user" };
+                }
+            })
+            .then((data) => {
+                alert(data.message || "User deleted successfully");
+            })
+            .catch((err) => {
+                console.error("Error deleting user:", err);
+                alert("An error occurred while deleting the user.");
+            });
+        }
+    }
+
+    function deleteExchange(_exchangeName) {
+      let action = confirm("Delete exchange: " + _exchangeName);
+
+      if (action){
+        const url = baseUrl + `/exchange?exchangeName=${encodeURIComponent(_exchangeName)}`;
+          const request = new Request(url, {
+              method: "DELETE",
+              headers: {
+                  "Content-Type": "application/json"
+              }
+          });
+          fetch(request).then((resp) => {
+            if (resp.ok) {
+            return resp.json();
+            } else {
+            return { message: "Unable to delete exchange" };
+            }
+        })
+        .then((data) => {
+            alert(data.message || "Exchange deleted successfully");
+        })
+        .catch((err) => {
+            console.error("Error deleting user:", err);
+            alert("An error occurred while deleting the user.");
+        });
+      }
+    }
+
+    let _userData = new Request(baseUrl+'/user')
+    let _exchangeData = new Request(baseUrl+'/exchange')
+
+    fetch(_userData)
+        .then(response => {
+            if (response.ok) {
+            return response.json();  // returns a Promise
+            } else {
+            return { users: [] };
+            }
+        })
+        .then(data => {
+            const users = data.users || [];
+            console.log("Users:", users);
+            renderUsers(users)
+        })
+        .catch(err => {
+            console.error("Fetch error:", err);
+        });
+
+
+    fetch(_exchangeData)
+        .then(response => {
+            if (response.ok) {
+            return response.json();  // returns a Promise
+            } else {
+            return { exchanges: [] };
+            }
+        })
+        .then(data => {
+            const exchanges = data.exchanges || [];
+            console.log("Exchanges:", exchanges);
+            renderExchanges(exchanges)
+        })
+        .catch(err => {
+            console.error("Fetch error:", err);
+        });
+
+  </script>
+
+</body>
+</html>

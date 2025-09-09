@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Login - SwitchMQ</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background: #f0f2f5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .login-container {
+            color: #444;
+            padding: 40px 30px;
+            border-radius: 10px;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .login-container h2 {
+            text-align: center;
+            margin-bottom: 25px;
+            color: #333;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #444;
+        }
+
+        input[type="text"],
+        input[type="password"] {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        input[type="text"]:focus,
+        input[type="password"]:focus {
+            border-color: #007BFF;
+            outline: none;
+        }
+
+        .login-button {
+            width: 100%;
+            padding: 12px;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            font-size: 16px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .login-button:hover {
+            background-color: #0056b3;
+        }
+
+        .bottom-text {
+            text-align: center;
+            margin-top: 15px;
+            font-size: 14px;
+            color: #666;
+        }
+
+        .bottom-text a {
+            color: #007BFF;
+            text-decoration: none;
+        }
+
+        .bottom-text a:hover {
+            text-decoration: underline;
+        }
+    </style>
+    <script>
+        const baseUrl = "https://42425-firebase-mb-sever-1756714755202.cluster-cz5nqyh5nreq6ua6gaqd7okl7o.cloudworkstations.dev";
+        const loginAction = (event) =>{
+            event.preventDefault()
+            let username = document.getElementById("username").value
+            let password = document.getElementById("password").value
+
+            url = baseUrl + "/auth/login"
+            request = new Request(url, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ username, password })
+            })
+
+            fetch(request).then((response)=>{
+                if(response.ok){
+                    return response.json()
+                }
+                else{
+                    throw new Error("Something Wrong!")
+                }
+            }).then((data)=>{
+                const authToken = data["auth-token"]
+                console.log(authToken)
+                document.cookie = `switchMqAuthorization=${authToken}; path=/`;
+                localStorage.setItem("switchMqAuthorization", authToken)
+                window.location.href="/ui"
+            }).catch((err)=>{
+                console.error(err)
+            })
+            
+        }
+    </script>
+</head>
+<body>
+    <div class="login-container">
+        <h2>Login to SwitchMQ</h2>
+        <form onsubmit="loginAction(event)">
+            <div class="form-group">
+                <label for="username">Username</label>
+                <input type="text" id="username" name="username" placeholder="guest" required />
+            </div>
+
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" placeholder="guest" required />
+            </div>
+
+            <button type="submit" class="login-button">Login</button>
+
+            <div class="bottom-text">
+                Don't have an account? <a href="mailto:harshasrikasyap807@gmail.com">Contact Me</a>
+            </div>
+        </form>
+    </div>
+</body>
+</html>
