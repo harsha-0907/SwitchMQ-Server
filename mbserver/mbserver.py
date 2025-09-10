@@ -1,6 +1,6 @@
 
 # Server responsible for websocket & MB
-import os, json, socket, asyncio, redis
+import os, json, socket, asyncio, redis, traceback
 from threading import Lock
 from dotenv import load_dotenv
 from mbexceptions import *
@@ -91,8 +91,11 @@ def processExchange(host, port, message) -> str:
         sock.sendall(bytes(message, "utf-8"))
         resp = sock.recv(1024).decode("utf-8")
     
+    except ConnectionError as _e:
+        resp = str(ReturnableException(ExchangeNotFoundError()))
+
     except Exception as _e:
-        resp = ReturnableExceptio(_e)
+        resp = str(ReturnableException(_e))
     
     finally:
         return resp
@@ -211,11 +214,14 @@ async def handleWebsocket(websocket: WebSocket, userData: dict = Depends(isAuthe
                 break
             
             except Exception as e:
+                print(e)
+                traceback.print_exc()
                 resp = str(ReturnableException(e))
                 await websocket.send_text(resp)
 
     except Exception as e:
         print(e)
+        traceback.print_exc()
     
     finally:
         # Connection terminated
