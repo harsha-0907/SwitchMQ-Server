@@ -19,9 +19,8 @@ def isAuthorizedForUI(switchMqAuthorization: str = Cookie(...)):
     
     raise HTTPException(
             status_code=401,
-            detail="Invalid token",  # Still required
-            headers={"WWW-Authenticate": "Bearer"},
-            response=UN_AUTH_401_RESP
+            detail="Invalid token",
+            headers={"WWW-Authenticate": "Bearer"}
         )
 
 def isAdmin(switchMqAuthorization: str = Cookie(...)):
@@ -33,10 +32,9 @@ def isAdmin(switchMqAuthorization: str = Cookie(...)):
             return userData
     
     raise HTTPException(
-            status_code=401,
-            detail="Un-Authorized",  # Still required
-            headers={"WWW-Authenticate": "Bearer"},
-            response=FORBIDDEN_403_RESP
+            status_code=403,
+            detail="Un-Authorized Actions",
+            headers={"WWW-Authenticate": "Bearer"}
         )
     
 CREDENTIALS_FILE = "credentials.json"
@@ -114,7 +112,7 @@ def addUser(newUserData: dict, _=Depends(isAdmin)):
         )
 
 @router.delete("/exchange")
-async def deleteExchange(exchangeName: str, request: Request):
+async def deleteExchange(exchangeName: str, request: Request, _=Depends(isAdmin)):
     print("Deleting Exchange", exchangeName)
     print(request.app.state.exchanges)
     await stopExchange(exchangeName, request.app.state.exchanges)
