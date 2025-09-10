@@ -4,16 +4,39 @@ import time
 import redis
 import asyncio
 from multiprocessing import Process, Event
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse
 from routes import login, uiPage
 from dotenv import load_dotenv
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from utils.utilsHelper import start_exchange
+from utils.routeUtils import fetchFile
 load_dotenv()
 
 app = FastAPI()
 
 app.include_router(login.router, tags=["Auth"])
 app.include_router(uiPage.router, tags=["Admin-UI"])
+
+@app.exception_handler(StarletteHTTPException)
+async def custom_http_exception_handler(request: Request, exc: StarletteHTTPException):
+    if exc.status_code == 404:
+        # Return a custom HTML response for 404
+        return HTMLResponse(
+            content="""
+            <html>
+                <head><title>404 Not Found</title></head>
+                <body style="font-family: Arial, sans-serif; text-align: center; padding: 2rem;">
+                    <h1>404 - Page Not Found</h1>
+                    <p>Oops! The page you are looking for does not exist.</p>
+                    <a href="/">Go back home</a>
+                </body>
+            </html>
+            """,
+            status_code=404,
+        )
+    # For other HTTP exceptions, just return the default one
+    return await app.default_exception_handler(request, exc)
 
 @app.on_event("startup")
 async def startup_event():
@@ -45,19 +68,17 @@ async def shutdown_event():
     for exchangeName, exchangeProcess in exchanges.items():
         exchangeObject, exchangeTerminateSwitch = exchangeProcess
         exchangeTerminateSwitch.set()
-        exchangeProcess.terminate()
-        exchangeProcess.join()
+        exchangeObject.terminate()
+        exchangeObject.join()
     
     time.sleep(1)   # Buffer for complete shutdown
     print("Exchanges terminated")
 
 @app.get("/")
 async def getHomePage():
-    return {
-        "statusCode": 200,
-        "message": "Server is alive and running"
-    }
+    homePage = fetchFile("src/index.html")
 
+    return HTMLResponse(content=homePage, status_code=200)
 
 if __name__ == "__main__":
     import uvicorn
