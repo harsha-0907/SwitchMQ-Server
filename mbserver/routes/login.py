@@ -1,6 +1,6 @@
 
 # Handles the entire login flow
-import json, aiofiles
+import json
 from typing import Annotated
 from utils.jwtUtils import encodeJWT
 from fastapi import APIRouter, Body
