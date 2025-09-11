@@ -8,12 +8,23 @@ from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
 from routes import login, uiPage
 from dotenv import load_dotenv
+from fastapi.middleware.cors import CORSMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from utils.utilsHelper import start_exchange
 from utils.routeUtils import fetchFile
 load_dotenv()
 
 app = FastAPI()
+
+origins = ["*"]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,        # List of allowed origins
+    allow_credentials=True,       # Allow cookies, Authorization headers etc.
+    allow_methods=["*"],          # Allow all HTTP methods (GET, POST, etc.)
+    allow_headers=["*"],          # Allow all headers
+)
+
 
 app.include_router(login.router, tags=["Auth"])
 app.include_router(uiPage.router, tags=["Admin-UI"])
