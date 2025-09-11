@@ -79,8 +79,3 @@ async def getHomePage():
     homePage = fetchFile("src/index.html")
 
     return HTMLResponse(content=homePage, status_code=200)
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run("utilServer:app", host="0.0.0.0", port=42425, reload=True)
-    

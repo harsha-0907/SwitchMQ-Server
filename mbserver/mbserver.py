@@ -1,6 +1,6 @@
 
 # Server responsible for websocket & MB
-import os, json, socket, asyncio, redis, traceback
+import os, json, socket, asyncio, redis
 from threading import Lock
 from dotenv import load_dotenv
 from mbexceptions import *
@@ -17,7 +17,6 @@ dbInfoLock = Lock()
 dbInfo = {}
 app = FastAPI()
 
-NUMBER_OF_MB_WORKERS = int(os.getenv("MB_WORKERS"))
 MAX_MESSAGE_SIZE = int(os.getenv("MAX_MESSAGE_SIZE"))
 
 def updateDBInfo():
@@ -246,7 +245,3 @@ async def setUp():
     bgScheduler.add_job(updateDBInfo, 'interval', seconds=5)
 
     print("Starting the System...")
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run("mbserver:app", host="0.0.0.0", port=42426, workers=NUMBER_OF_MB_WORKERS, reload=True)  # TO-DO Change this
