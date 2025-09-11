@@ -15,6 +15,7 @@ load_dotenv()
 
 app = FastAPI()
 
+HOST_NAME = os.getenv("HOST_NAME")
 app.include_router(login.router, tags=["Auth"])
 app.include_router(uiPage.router, tags=["Admin-UI"])
 
@@ -40,6 +41,8 @@ async def custom_http_exception_handler(request: Request, exc: StarletteHTTPExce
 
 @app.on_event("startup")
 async def startup_event():
+    global HOST_NAME
+    app.state.hostName = HOST_NAME
     app.state.exchanges = dict()
     app.state.redisClient = redis.Redis(
         host=os.getenv("REDIS_HOST"),
@@ -50,7 +53,7 @@ async def startup_event():
     )
     processTerminateSwitch = Event()
     args = {
-        "hostName": "server01",
+        "hostName": HOST_NAME,
         "exchangeName": "default",
         "port": 46123,
         "queues": ["default"],
