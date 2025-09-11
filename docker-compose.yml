@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  switchmq-server:
+    image: switchmq:mvp1
+    container_name: switchmq-server
+    ports:
+      - "42425:42425"
+      - "42426:42426"
+    volumes:
+      - ./.env:/app/mbserver/.env
+    env_file:
+      - .env
