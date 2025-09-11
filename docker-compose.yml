@@ -1,0 +1,9 @@
+version: '3.9'
+services:
+  switchmq:
+    build: .
+    ports:
+      - "42425:42425"
+      - "42426:42426"
+    env_file:
+      - .env  # Your .env file path
