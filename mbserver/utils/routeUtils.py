@@ -1,6 +1,6 @@
 
 from typing import List
-from pydantic import BaseModel, Fields
+from pydantic import BaseModel, Field
 from functools import lru_cache
 
 @lru_cache
