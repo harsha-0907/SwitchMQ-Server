@@ -36,8 +36,6 @@ async def custom_http_exception_handler(request: Request, exc: StarletteHTTPExce
             """,
             status_code=404,
         )
-    # For other HTTP exceptions, just return the default one
-    return await app.default_exception_handler(request, exc)
 
 @app.on_event("startup")
 async def startup_event():
