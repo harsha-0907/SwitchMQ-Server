@@ -2,13 +2,15 @@
 # This handles all the actions for Admin Page
 # TO-DO : Shift the page handling from Files to tinydb
 import json
+from random import randint
 from typing import Annotated
-from fastapi import APIRouter, Depends, Cookie, HTTPException, Request
+from multiprocessing import Event, Process
+from fastapi import APIRouter, Depends, Cookie, HTTPException, Request, Body
 from fastapi.responses import HTMLResponse, JSONResponse
 from utils.responsePages import *
-from utils.routeUtils import fetchFile
+from utils.routeUtils import fetchFile, NewExchange
 from utils.jwtUtils import decodeJWT
-from utils.utilsHelper import stopExchange
+from utils.utilsHelper import stopExchange, start_exchange
 
 def isAuthorizedForUI(switchMqAuthorization: str = Cookie(...)):
     """ Checks if the user has access to UI"""
@@ -44,16 +46,11 @@ router = APIRouter(prefix="/ui", dependencies=[Depends(isAuthorizedForUI)])
 @router.delete("/user")
 def deleteUser(username: str, _=Depends(isAdmin)):
     print("User is getting deleted")
-    return JSONResponse(
-        content={
-            "message": f"{username} Deleted Successfully"
-        }, status_code=200
-    )
-
+    
     with open(CREDENTIALS_FILE, 'r') as file:
         userData = json.load(file)
 
-    if username in userData:
+    if username in userData and username != "admin":
         del(userData[username])
         with open(CREDENTIALS_FILE, 'w') as file:
             json.dump(userData, file, indent=4)
@@ -65,8 +62,7 @@ def deleteUser(username: str, _=Depends(isAdmin)):
     )
  
 @router.put("/user")
-def addUser(newUserData: dict, _=Depends(isAdmin)):
-    # TO-DO : Complete the part to add the user into the dictionary and save the file
+def updateOrAddUser(request: Request, newUserData: Annotated[dict, Body()], _=Depends(isAdmin)):
     try:
         with open(CREDENTIALS_FILE, 'r') as file:
             userData = json.load(file)
@@ -85,26 +81,25 @@ def addUser(newUserData: dict, _=Depends(isAdmin)):
         )
     
     try:
-        if username in userData:
-            # Update the User
-            return JSONResponse(
-                content={
-                    "message": "User already exists!"
-                },status_code=200
-            )
+        # TO-DO - Need to check if the queues are present - > Future update
+        userExchanges = newUserData.get("access", {}).get("exchange", ["default"])
+        presentExchanges = request.app.state.exchanges
+        for exchange in userExchanges:
+            if exchange not in presentExchanges:
+                return JSONResponse(content={
+                    "message": "Unable to create user, exchange not available"
+                }, status_code=403)
+    
+        newUserData["access"]["admin"] = False    
+        userData[username] = newUserData
 
-        else:
-            newUserData["access"]["ui"] = True
-            newUserData["access"]["admin"] = False
-            userData[username] = newUserData
+        with open(CREDENTIALS_FILE, 'w') as file:
+            json.dump(userData, file, indent=4)
 
-            with open(CREDENTIALS_FILE, 'w') as file:
-                json.dump(userData, file, indent=4)
-
-            return JSONResponse(
-                content={"message": f"User '{username}' added successfully."},
-                status_code=201
-            )
+        return JSONResponse(
+            content={"message": f"User '{username}' added/updated successfully."},
+            status_code=201
+        )
     
     except Exception as _e:
         return JSONResponse(status_code=600,
@@ -120,6 +115,36 @@ async def deleteExchange(exchangeName: str, request: Request, _=Depends(isAdmin)
     return JSONResponse(content={
         "message": "Exchange is being stopped"
     }, status_code=200)
+
+@router.put("/exchange")
+def addExchange(request: Request, newExchangeData: Annotated[NewExchange, Body()],_=Depends(isAdmin)):
+    """ Checks if the exchange is already present. If yes creates one else raises error"""
+    hostName = request.app.state.hostName
+    if request.app.state.redisClient.hgetall(hostName+'.'+newExchangeData.exchangeName):
+        return JSONResponse(
+            content={
+                "message": "Exchange already present. Not created"
+            }, status_code=403
+        )
+
+    # Else return Added NewExchange
+    processTerminateSwitch = Event()
+    args = {
+        "hostName": hostName,
+        "exchangeName": newExchangeData.exchangeName,
+        "port": randint(50000, 65535),
+        "queues": ["default"],
+        "terminateSwitch": processTerminateSwitch
+    }
+    exchangeProcess = Process(target=start_exchange, args=(args,))
+    exchangeProcess.start()
+    request.app.state.exchanges[newExchangeData.exchangeName] = (exchangeProcess, processTerminateSwitch)
+    
+    return JSONResponse(
+        content={
+            "message": f"Exchange Created : {newExchangeData.exchangeName}"
+        }, status_code=200
+    )
 
 # Non-Admin Priviliges
 @router.get("/")
