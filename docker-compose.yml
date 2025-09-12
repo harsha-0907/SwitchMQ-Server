@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   switchmq-server:
-    image: switchmq:mvp1
+    image: ionlyusedocker/switchmq:mvp1
     container_name: switchmq-server
     ports:
       - "42425:42425"
