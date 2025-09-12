@@ -81,8 +81,8 @@ def updateOrAddUser(request: Request, newUserData: Annotated[dict, Body()], _=De
         )
     
     try:
-        # TO-DO - Need to check if the exchange is present (If not -> error)
-        userExchanges = newUserData.get("access", {}).get("exchange", [])
+        # TO-DO - Need to check if the queues are present - > Future update
+        userExchanges = newUserData.get("access", {}).get("exchange", ["default"])
         presentExchanges = request.app.state.exchanges
         for exchange in userExchanges:
             if exchange not in presentExchanges:
@@ -117,10 +117,10 @@ async def deleteExchange(exchangeName: str, request: Request, _=Depends(isAdmin)
     }, status_code=200)
 
 @router.put("/exchange")
-def addExchange(newExchangeData: Annotated[NewExchange, Body()], request: Request):
+def addExchange(request: Request, newExchangeData: Annotated[NewExchange, Body()],_=Depends(isAdmin)):
     """ Checks if the exchange is already present. If yes creates one else raises error"""
     hostName = request.app.state.hostName
-    if app.state.redisClient.hgetall(hostName+'.'+newExchangeData.exchangeName):
+    if request.app.state.redisClient.hgetall(hostName+'.'+newExchangeData.exchangeName):
         return JSONResponse(
             content={
                 "message": "Exchange already present. Not created"
@@ -138,7 +138,7 @@ def addExchange(newExchangeData: Annotated[NewExchange, Body()], request: Reques
     }
     exchangeProcess = Process(target=start_exchange, args=(args,))
     exchangeProcess.start()
-    request.app.state.exchanges[newExchange.exchangeName] = (exchangeProcess, processTerminateSwitch)
+    request.app.state.exchanges[newExchangeData.exchangeName] = (exchangeProcess, processTerminateSwitch)
     
     return JSONResponse(
         content={
