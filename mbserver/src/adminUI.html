@@ -78,12 +78,12 @@
     }
 
     .data-row {
-      margin: 2px 0;
+      margin: 6px 0;
     }
 
     .data-row strong {
       display: inline-block;
-      min-width: 120px;
+      min-width: 160px;
       color: #555;
     }
 
@@ -107,7 +107,13 @@
     }
 
     .btn-container {
-      margin-top: 8px;
+      margin-top: 10px;
+    }
+
+    input[type="text"], input[type="password"] {
+      padding: 4px;
+      font-size: 13px;
+      width: 80%;
     }
 
     @media (max-width: 768px) {
@@ -132,10 +138,54 @@
       <div id="usersContainer" class="grid"></div>
     </section>
 
+    <!-- Add User Section -->
+    <section>
+      <div class="section-title">Add New User</div>
+      <div class="card">
+        <div class="data-row">
+          <strong>Username:</strong>
+          <input type="text" id="newUsername" />
+        </div>
+        <div class="data-row">
+          <strong>Password:</strong>
+          <input type="password" id="newPassword" />
+        </div>
+        <div class="data-row">
+          <strong>UI Access:</strong>
+          <input type="checkbox" id="uiAccess" />
+        </div>
+        <div class="data-row">
+          <strong>Allowed Exchanges (comma-separated):</strong>
+          <input type="text" id="allowedExchanges" />
+        </div>
+        <div class="data-row">
+          <strong>Allowed Queues (comma-separated):</strong>
+          <input type="text" id="allowedQueues" />
+        </div>
+        <div class="btn-container">
+          <button class="btn edit-btn" onclick="addUser()">Add User</button>
+        </div>
+      </div>
+    </section>
+
     <!-- Exchanges Section -->
     <section>
       <div class="section-title">Exchanges</div>
       <div id="exchangesContainer" class="grid"></div>
+    </section>
+
+    <!-- Add Exchange Section -->
+    <section>
+      <div class="section-title">Add New Exchange</div>
+      <div class="card">
+        <div class="data-row">
+          <strong>Exchange Name:</strong>
+          <input type="text" id="newExchangeName" />
+        </div>
+        <div class="btn-container">
+          <button class="btn edit-btn" onclick="addExchange()">Add Exchange</button>
+        </div>
+      </div>
     </section>
 
   </div>
@@ -143,7 +193,6 @@
   <script>
     const baseUrl = "https://42425-firebase-mb-sever-1756714755202.cluster-cz5nqyh5nreq6ua6gaqd7okl7o.cloudworkstations.dev/ui";
 
-    // 🔐 Logout function
     function logout() {
       localStorage.removeItem("switchMqAuthorization");
       document.cookie = "switchMqAuthorization=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
@@ -189,6 +238,8 @@
 
     function renderExchanges(exchanges) {
       const container = document.getElementById("exchangesContainer");
+      container.innerHTML = "";
+
       exchanges.forEach(exchange => {
         const exchangeDiv = document.createElement("div");
         exchangeDiv.className = "card";
@@ -213,62 +264,120 @@
       alert("Edit user: " + username);
     }
 
-    function deleteUser(_username) {
-      const action = confirm("Delete user: " + _username);
+    function deleteUser(username) {
+      const action = confirm("Delete user: " + username);
       if (action) {
-        const url = baseUrl + `/user?username=${encodeURIComponent(_username)}`;
-        const request = new Request(url, {
+        const url = baseUrl + `/user?username=${encodeURIComponent(username)}`;
+        fetch(url, {
           method: "DELETE",
-          headers: {
-            "Content-Type": "application/json"
-          }
+          headers: { "Content-Type": "application/json" }
+        })
+        .then(resp => resp.ok ? resp.json() : { message: "Unable to delete user" })
+        .then(data => {
+          alert(data.message || "User deleted successfully");
+          location.reload();
+        })
+        .catch(err => {
+          console.error("Error deleting user:", err);
+          alert("An error occurred while deleting the user.");
         });
-
-        fetch(request).then(resp => resp.ok ? resp.json() : { message: "Unable to delete user" })
-          .then(data => {
-            alert(data.message || "User deleted successfully");
-            location.reload();
-          })
-          .catch(err => {
-            console.error("Error deleting user:", err);
-            alert("An error occurred while deleting the user.");
-          });
       }
     }
 
-    function deleteExchange(_exchangeName) {
-      let action = confirm("Delete exchange: " + _exchangeName);
+    function deleteExchange(exchangeName) {
+      const action = confirm("Delete exchange: " + exchangeName);
       if (action) {
-        const url = baseUrl + `/exchange?exchangeName=${encodeURIComponent(_exchangeName)}`;
-        const request = new Request(url, {
+        const url = baseUrl + `/exchange?exchangeName=${encodeURIComponent(exchangeName)}`;
+        fetch(url, {
           method: "DELETE",
-          headers: {
-            "Content-Type": "application/json"
-          }
+          headers: { "Content-Type": "application/json" }
+        })
+        .then(resp => resp.ok ? resp.json() : { message: "Unable to delete exchange" })
+        .then(data => {
+          alert(data.message || "Exchange deleted successfully");
+          location.reload();
+        })
+        .catch(err => {
+          console.error("Error deleting exchange:", err);
+          alert("An error occurred while deleting the exchange.");
         });
-
-        fetch(request).then(resp => resp.ok ? resp.json() : { message: "Unable to delete exchange" })
-          .then(data => {
-            alert(data.message || "Exchange deleted successfully");
-            location.reload();
-          })
-          .catch(err => {
-            console.error("Error deleting exchange:", err);
-            alert("An error occurred while deleting the exchange.");
-          });
       }
     }
 
-    // ✅ Fetch and render users
+    function addUser() {
+      const username = document.getElementById("newUsername").value.trim();
+      const password = document.getElementById("newPassword").value.trim();
+      const uiAccess = document.getElementById("uiAccess").checked;
+      const exchanges = document.getElementById("allowedExchanges").value.trim().split(",").map(e => e.trim()).filter(e => e);
+      const queues = document.getElementById("allowedQueues").value.trim().split(",").map(q => q.trim()).filter(q => q);
+
+      if (!username || !password) {
+        alert("Username and password are required.");
+        return;
+      }
+
+      const payload = {
+        username: username,
+        password: password,
+        access: {
+          ui: uiAccess,
+          exchange: exchanges.length ? exchanges : ["default"],
+          queue: queues.length ? queues : ["default"]
+        }
+      };
+
+      fetch(baseUrl + '/user', {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      })
+      .then(resp => resp.json())
+      .then(data => {
+        alert(data.message)
+        location.reload();
+      })
+      .catch(err => {
+        console.error("Error adding user:", err);
+        alert("An error occurred while adding the user.");
+      });
+    }
+
+    function addExchange() {
+      const exchangeName = document.getElementById("newExchangeName").value.trim();
+      if (!exchangeName) {
+        alert("Exchange name is required.");
+        return;
+      }
+
+      const payload = { exchangeName: exchangeName };
+
+      fetch(baseUrl + "/exchange", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      })
+      .then(resp => resp.json())
+      .then(data => {
+        alert(data.message || "Exchange created successfully.");
+        location.reload();
+      })
+      .catch(err => {
+        console.error("Error adding exchange:", err);
+        alert("An error occurred while adding the exchange.");
+      });
+    }
+
+    // Initial fetch for users and exchanges
     fetch(baseUrl + '/user')
       .then(response => response.ok ? response.json() : { users: [] })
       .then(data => {
-        const users = data.users || {};
-        renderUsers(users);
+        const users = Array.isArray(data.users) ? data.users : [];
+        const usersMap = {};
+        users.forEach(u => usersMap[u.username] = u);
+        renderUsers(usersMap);
       })
       .catch(err => console.error("Fetch error (users):", err));
 
-    // ✅ Fetch and render exchanges
     fetch(baseUrl + '/exchange')
       .then(response => response.ok ? response.json() : { exchanges: [] })
       .then(data => {
