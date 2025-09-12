@@ -62,7 +62,7 @@ def deleteUser(username: str, _=Depends(isAdmin)):
     )
  
 @router.put("/user")
-def updateOrAddUser(request: Request, newUserData: Annotated[str, Body()], _=Depends(isAdmin)):
+def updateOrAddUser(request: Request, newUserData: Annotated[dict, Body()], _=Depends(isAdmin)):
     try:
         with open(CREDENTIALS_FILE, 'r') as file:
             userData = json.load(file)
