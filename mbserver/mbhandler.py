@@ -1,6 +1,6 @@
 
 # Server responsible for websocket & MB
-import os, json, socket, asyncio, redis
+import os, json, socket, asyncio, redis, time
 from threading import Lock
 from dotenv import load_dotenv
 from mbexceptions import *
@@ -111,8 +111,11 @@ async def executeCommand(rawMessage:str, userData, inputData: dict)-> str:
     
     with dbInfoLock:
         exchangeInfo = dbInfo.get(reqExchange, None)
-
+    
+    print(inputData)
+    print(dbInfo)
     if exchangeInfo is None:
+        print("Exchange not Found")
         raise ExchangeNotFoundError()
     
     exchangeStats = exchangeInfo.get("stats")
@@ -172,6 +175,45 @@ async def executeCommand(rawMessage:str, userData, inputData: dict)-> str:
             
             raise UnknownException(message=resp.get("message", "Unknown Exception"), statusCode=respStatusCode)
 
+    elif reqAction == "UPDATE-ADD":
+        print(reqAction)
+        resp = json.loads(await asyncio.to_thread(processExchange, exchangeHost, exchangePort, rawMessage))
+
+        respStatusCode = resp.get("statusCode", 600)
+
+        if respStatusCode == 200:
+            count = resp.get("stats", {}).get("count", None)
+            if count:
+                dbInfo[reqExchange]["stats"]["count"] = count
+            
+            return json.dumps({
+                "statusCode": 200,
+                "error": False,
+                "message": resp.get("message")
+            })
+
+        else:
+            raise UnknownException(message=resp.get("message"), statusCode=respStatusCode)
+    
+    elif reqAction == "UPDATE-REMOVE":
+        resp = json.loads(await asyncio.to_thread(processExchange, exchangeHost, exchangePort, rawMessage))
+
+        respStatusCode = resp.get("statusCode", 600)
+
+        if respStatusCode == 200:
+            count = resp.get("stats", {}).get("count", None)
+            if count:
+                dbInfo[reqExchange]["stats"]["count"] = count
+            
+            return json.dumps({
+                "statusCode": 200,
+                "error": False,
+                "message": resp.get("message")
+            })
+
+        else:
+            raise UnknownException(message=resp.get("message"), statusCode=respStatusCode)
+
     else:
         raise UnknownException(message="Action: Action not Recognized")
 
@@ -214,13 +256,11 @@ async def handleWebsocket(websocket: WebSocket, userData: dict = Depends(isAuthe
             
             except Exception as e:
                 print(e)
-                traceback.print_exc()
                 resp = str(ReturnableException(e))
                 await websocket.send_text(resp)
 
     except Exception as e:
         print(e)
-        traceback.print_exc()
     
     finally:
         # Connection terminated
@@ -242,6 +282,7 @@ async def setUp():
     # Seting up the background scheduler
     bgScheduler = BackgroundScheduler()
     bgScheduler.start()
-    bgScheduler.add_job(updateDBInfo, 'interval', seconds=5)
-
+    bgScheduler.add_job(updateDBInfo, 'interval', seconds=3)
+    time.sleep(2)
     print("Starting the System...")
+
