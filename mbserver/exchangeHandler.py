@@ -76,15 +76,27 @@ class Exchange:
         # Initializing BgScheduler
         scheduler = BackgroundScheduler()
         scheduler.start()
-        scheduler.add_job(self.updateRedis, 'interval', seconds=5)
+        scheduler.add_job(self.updateRedis, 'interval', seconds=3)
 
     def addQueue(self, queueName: str):
         if queueName in self.__queues:
-            # Update the status of the request in redis to False
             return False
         
         self.__queues[queueName] = Queue(queueName)
     
+    async def deleteQueue(self ,queueName):
+        # Deletes all the messages in the queue
+        queue = self.__queues[queueName]
+        while True:
+            try:
+                messageId = queue.popMessage()
+                await self.fetchMessage(messageId)
+
+            except NoMessageException as _e:
+                break
+
+        return True
+
     def initializeRedis(self):
         self.__redisCreds = {
             "host": os.getenv("REDIS_HOST"),
@@ -237,6 +249,32 @@ class Exchange:
 
             raise UnknownException("Unknown Exception")
 
+        elif action == "UPDATE-ADD":
+            queueName = queueNames[0]
+            self.addQueue(queueName)
+                
+            return json.dumps({
+                "statusCode": 200,
+                "error": False,
+                "message": "Queue Added",
+                "stats": {
+                    "count": self.totalMessages
+                }
+            })
+        
+        elif action == "UPDATE-REMOVE":
+            queueName = queueNames[0]
+            await self.deleteQueue(queueName)
+            print(self.__queues)
+            return json.dumps({
+                "statusCode": 200,
+                "error": False,
+                "message": "Queue Removed",
+                "stats": {
+                    "count": self.totalMessages
+                }
+            })
+            
         else:
             raise UnknownException("Action: Unauthorized Action")
 
