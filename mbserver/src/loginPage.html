@@ -92,7 +92,12 @@
         }
     </style>
     <script>
-        const baseUrl = "http://localhost:42425";
+        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+
+        const baseUrl = isLocal
+        ? "http://localhost:42425"
+        : "http://switchmq.ddns.net:42425";
+
         const loginAction = (event) =>{
             event.preventDefault()
             let username = document.getElementById("username").value

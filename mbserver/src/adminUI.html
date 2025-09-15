@@ -191,7 +191,12 @@
   </div>
 
   <script>
-    const baseUrl = "http://localhost:42425/ui";
+    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+
+    const baseUrl = isLocal
+      ? "http://localhost:42425/ui"
+      : "http://switchmq.ddns.net:42425/ui";
+
 
     function logout() {
       localStorage.removeItem("switchMqAuthorization");
