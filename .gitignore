@@ -5,3 +5,4 @@ devserver.sh
 .env
 temp/
 mbclient/
+.messageCache

@@ -40,12 +40,25 @@ class Queue:
             self.tail = None
 
         return message.messageId
+    
+    def copy(self):
+        messageIds = []; msg = self.head.next
+        if msg is None:
+            return messageIds
+        
+        while msg:
+            messageIds.append(msg.messageId)
+            msg = msg.next
+        
+        return messageIds
+        
 
 class Exchange:
     def __init__(self, hostName: str, exchangeName: str,
         port: int, terminateSwitch, queues: list = None, priority: int = 1,
         bind_local: bool = True, maxSocketConnections: int = 10,
-        timeOut: int = 5, maxMessages: int = 10000
+        timeOut: int = 5, maxMessages: int = 10000, saveFrequency: int = 60,
+        redisUpdateFrequency: int = 3, relativeMessageStoreDirectory: str = ".messageCache"
     ):
         self.hostName: str = hostName
         self.ipAddress: str = "127.0.0.1" if bind_local else "0.0.0.0"
@@ -56,12 +69,47 @@ class Exchange:
         self.__terminateExchange = terminateSwitch
         self.maxSocketConnections = maxSocketConnections
         self.timeOut = timeOut
-        self.initializeRedis()
+        self.redisUpdateFrequency = redisUpdateFrequency
+        self.saveFrequency = saveFrequency
+        if not os.path.exists(relativeMessageStoreDirectory):
+            os.makedirs(relativeMessageStoreDirectory)
+        
+        self.relativeMessageStorePath = os.path.join(relativeMessageStoreDirectory,self.exchangeName+'.store')
 
+        self.totalMessages = 0
+        self.maxMessages = maxMessages
         self.__messages = {}  # {primaryId: {secId: (message, count)}}
         self.__locks = {}     # {primaryId: asyncio.Lock()}
 
-        # Initialize queues if provided
+        # Initializing components
+        self.initializeQueuesAndExchange(queues)
+        self.initializeScheduler()
+        self.initializeRedisScheduler()
+        self.initializePersistence()
+
+    def persistExchange(self):
+        """ Saves the messages and queue order in a json file """
+        logFileObject = open(self.relativeMessageStorePath, 'w')   # Replace this with aiofiles 
+        exchangeData = dict()
+        exchangeData["queues"] = dict(); exchangeData["messages"] = dict()
+        
+        for queueName, queueObj in self.__queues.items():
+            messages = queueObj.copy()
+            exchangeData["queues"][queueName] = messages
+
+        for partitionId, partitionObj in self.__messages.items():
+            if len(partitionObj) == 0:
+                continue
+            exchangeData["messages"][partitionId] = partitionObj
+        
+        json.dump(exchangeData, logFileObject, indent=4)
+        logFileObject.close()
+
+    def initializePersistence(self):
+        """ Initializes background scheduler to copy data every interval"""
+        self.scheduler.add_job(self.persistExchange, 'interval', seconds=self.saveFrequency)
+
+    def initializeQueuesAndExchange(self, queues):
         if queues:
             for queue in queues:
                 self.addQueue(queue)
@@ -70,13 +118,10 @@ class Exchange:
             self.__messages[i] = {}
             self.__locks[i] = asyncio.Lock()
 
-        self.totalMessages = 0
-        self.maxMessages = maxMessages
-        
-        # Initializing BgScheduler
-        scheduler = BackgroundScheduler()
-        scheduler.start()
-        scheduler.add_job(self.updateRedis, 'interval', seconds=3)
+    def initializeScheduler(self):
+        """ Initialize background scheduler & filepath for storage"""
+        self.scheduler = BackgroundScheduler()
+        self.scheduler.start()
 
     def addQueue(self, queueName: str):
         if queueName in self.__queues:
@@ -97,7 +142,7 @@ class Exchange:
 
         return True
 
-    def initializeRedis(self):
+    def initializeRedisScheduler(self):
         self.__redisCreds = {
             "host": os.getenv("REDIS_HOST"),
             "port": int(os.getenv("REDIS_PORT")),
@@ -112,6 +157,8 @@ class Exchange:
             username=self.__redisCreds["username"],
             password=self.__redisCreds["password"]
         )
+        # Adding the job to scheduler
+        self.scheduler.add_job(self.updateRedis, 'interval', seconds=self.redisUpdateFrequency)
         
     def updateRedis(self):
         """ Updates the Redis with database Info"""
@@ -227,7 +274,7 @@ class Exchange:
                 raise ExchangeOverflowError()
             
             messageId = fetchMessageId()
-            await self.saveMessage(message=message, messageId=messageId, numberOfCopies=len(queueNames))
+            await self.saveMessage(message=messageBody, messageId=messageId, numberOfCopies=len(queueNames))
             self.totalMessages += 1
 
             for queueName in queueNames:
