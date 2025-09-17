@@ -51,7 +51,6 @@ class Queue:
             msg = msg.next
         
         return messageIds
-        
 
 class Exchange:
     def __init__(self, hostName: str, exchangeName: str,
@@ -177,7 +176,9 @@ class Exchange:
         queues = ','.join(list(self.__queues.keys()))
         exchangeValues["queues"] = queues
         print("Updating Redis DB")
-        self.__redisClient.hset(self.hostName+'.'+self.exchangeName, mapping=exchangeValues)
+        keyName = self.hostName+'.'+self.exchangeName
+        self.__redisClient.hset(keyName, mapping=exchangeValues)
+        self.__redisClient.expire(keyName, 7)
 
     async def saveMessage(self, message: str, messageId: str, numberOfCopies):
         primaryId, secId = messageId.split("."); primaryId = int(primaryId)
@@ -270,6 +271,7 @@ class Exchange:
         
         elif action == "POST":
             # All exceptions will be handled at the socket
+            print(type(self.totalMessages), type(self.maxMessages))
             if self.totalMessages >= self.maxMessages:
                 raise ExchangeOverflowError()
             
