@@ -8,8 +8,9 @@ def start_exchange(args):
     port=args["port"]
     queues=args["queues"]
     terminateSwitch=args["terminateSwitch"]
+    maxMessages = args["maxMessagesPerExchange"]
 
-    exchange = Exchange(hostName=hostName, exchangeName=exchangeName, port=port, queues=queues, terminateSwitch=terminateSwitch)
+    exchange = Exchange(hostName=hostName, exchangeName=exchangeName, port=port, queues=queues, terminateSwitch=terminateSwitch, maxMessages=maxMessages)
     asyncio.run(exchange.handleSocket())  # Runs the async socket server
 
 async def stopExchange(exchangeName, exchanges):
