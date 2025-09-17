@@ -228,6 +228,10 @@ class Exchange:
     
     # Socket Handler
     async def handleSocket(self):
+        async def isStopping(event):
+            loop = asyncio.get_running_loop()
+            await loop.run_in_executor(None, event.wait)
+
         server = await asyncio.start_server(
             self.handle_client,
             self.ipAddress,
@@ -238,10 +242,8 @@ class Exchange:
         print(f"Server started on {self.ipAddress}:{self.port}")
 
         async with server:
-            while not self.__terminateExchange.is_set():
-                # print(self.__terminateExchange)
-                await asyncio.sleep(0.01) # 0.01 sec is found to be optimal
-
+            stop = asyncio.create_task(isStopping(self.__terminateExchange))
+            await stop
         print("Exchange Stopped")
 
     async def processMessage(self, message: str):
@@ -271,7 +273,6 @@ class Exchange:
         
         elif action == "POST":
             # All exceptions will be handled at the socket
-            print(type(self.totalMessages), type(self.maxMessages))
             if self.totalMessages >= self.maxMessages:
                 raise ExchangeOverflowError()
             
@@ -314,7 +315,6 @@ class Exchange:
         elif action == "UPDATE-REMOVE":
             queueName = queueNames[0]
             await self.deleteQueue(queueName)
-            print(self.__queues)
             return json.dumps({
                 "statusCode": 200,
                 "error": False,
