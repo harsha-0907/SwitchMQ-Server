@@ -16,6 +16,8 @@ load_dotenv()
 app = FastAPI()
 
 HOST_NAME = os.getenv("HOST_NAME")
+MAX_MESSAGES = int(os.getenv("MAX_EXCHANGE_SIZE"))
+
 app.include_router(login.router, tags=["Auth"])
 app.include_router(uiPage.router, tags=["Admin-UI"])
 
@@ -39,7 +41,7 @@ async def custom_http_exception_handler(request: Request, exc: StarletteHTTPExce
 
 @app.on_event("startup")
 async def startup_event():
-    global HOST_NAME
+    global HOST_NAME, MAX_MESSAGES
     app.state.hostName = HOST_NAME
     app.state.exchanges = dict()
     app.state.redisClient = redis.Redis(
@@ -55,7 +57,8 @@ async def startup_event():
         "exchangeName": "default",
         "port": 46123,
         "queues": ["default"],
-        "terminateSwitch": processTerminateSwitch
+        "terminateSwitch": processTerminateSwitch,
+        "maxMessagesPerExchange": MAX_MESSAGES
     }
     exchangeProcess = Process(target=start_exchange, args=(args,))
     exchangeProcess.start()
